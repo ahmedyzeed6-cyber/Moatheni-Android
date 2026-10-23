@@ -11,8 +11,24 @@ android {
         applicationId = "com.moatheni.app"
         minSdk = 23
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
+    }
+
+    signingConfigs {
+        create("release") {
+            storeFile = file("moatheni-release.jks")
+            storePassword = System.getenv("MOATHENI_STORE_PASSWORD")
+            keyAlias = System.getenv("MOATHENI_KEY_ALIAS")
+            keyPassword = System.getenv("MOATHENI_KEY_PASSWORD")
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = false
+        }
     }
 
     compileOptions {
