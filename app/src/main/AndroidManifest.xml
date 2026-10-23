@@ -8,6 +8,8 @@
     <application
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:label="مؤذني"
+        android:icon="@drawable/ic_moatheni"
+        android:roundIcon="@drawable/ic_moatheni"
         android:usesCleartextTraffic="false"
         android:supportsRtl="true">
 
