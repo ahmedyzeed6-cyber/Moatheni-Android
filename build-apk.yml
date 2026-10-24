@@ -1,0 +1,61 @@
+name: Build Moatheni APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Decode signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.MOATHENI_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          test -n "$KEYSTORE_BASE64" || { echo "::error::MOATHENI_KEYSTORE_BASE64 is empty or unavailable"; exit 1; }
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > app/moatheni-release.jks
+          test -s app/moatheni-release.jks || { echo "::error::Decoded keystore is empty"; exit 1; }
+
+      - name: Detect signing alias and validate keystore
+        env:
+          STORE_PASSWORD: ${{ secrets.MOATHENI_STORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$STORE_PASSWORD" || { echo "::error::MOATHENI_STORE_PASSWORD is empty or unavailable"; exit 1; }
+
+          KEY_ALIAS="$(keytool -list -keystore app/moatheni-release.jks -storepass "$STORE_PASSWORD" 2>/dev/null | awk -F, '/PrivateKeyEntry/ { gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1); print $1; exit }')"
+
+          test -n "$KEY_ALIAS" || { echo "::error::No private-key alias found. Check the keystore and store password."; exit 1; }
+
+          echo "MOATHENI_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "Signing alias detected. Keystore validation passed."
+
+      - name: Build APK
+        env:
+          MOATHENI_STORE_PASSWORD: ${{ secrets.MOATHENI_STORE_PASSWORD }}
+          MOATHENI_KEY_PASSWORD: ${{ secrets.MOATHENI_KEY_PASSWORD }}
+        run: gradle --no-daemon assembleRelease
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Moatheni-release-apk
+          path: app/build/outputs/apk/release/*.apk
