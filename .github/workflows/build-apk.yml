@@ -15,6 +15,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Unpack optional ZIP update
+        run: |
+          set -euo pipefail
+          if [ -f Moatheni-Update.zip ]; then
+            unzip -o Moatheni-Update.zip -d .
+          fi
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -33,7 +40,7 @@ jobs:
           set -euo pipefail
           test -n "$KEYSTORE_BASE64" || { echo "::error::Keystore secret is empty or unavailable"; exit 1; }
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > app/moatheni-release.jks
-          test -s app/moatheni-release.jks || { echo "::error::Decoded keystore is empty"; exit 1; }
+          test -s app/moatheni-release.jks
 
       - name: Detect signing alias and validate keystore
         env:
@@ -41,13 +48,9 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$STORE_PASSWORD" || { echo "::error::Store password is empty or unavailable"; exit 1; }
-
           KEY_ALIAS="$(keytool -list -keystore app/moatheni-release.jks -storepass "$STORE_PASSWORD" 2>/dev/null | awk -F, '/PrivateKeyEntry/ { gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1); print $1; exit }')"
-
-          test -n "$KEY_ALIAS" || { echo "::error::No private-key alias found. Check the keystore and store password."; exit 1; }
-
+          test -n "$KEY_ALIAS" || { echo "::error::No private-key alias found"; exit 1; }
           echo "MOATHENI_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
-          echo "Signing alias detected. Keystore validation passed."
 
       - name: Build APK
         env:
