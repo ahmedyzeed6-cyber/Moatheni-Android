@@ -9,6 +9,8 @@ import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.location.Geocoder
+import java.util.Locale
 import android.os.Bundle
 import android.os.Looper
 import android.provider.Settings
@@ -92,7 +94,30 @@ class MainActivity : Activity() {
                             if (fresh && accurate) {
                                 delivered = true
                                 try { manager.removeUpdates(this) } catch (_: Exception) {}
-                                web.evaluateJavascript("window.onNativeLocation({lat:${location.latitude},lon:${location.longitude},accuracy:${location.accuracy}})", null)
+                                val latitude = location.latitude
+                                val longitude = location.longitude
+                                // Resolve coordinates to a readable Arabic city name off the UI thread.
+                                Thread {
+                                    val city = try {
+                                        if (Geocoder.isPresent()) {
+                                            @Suppress("DEPRECATION")
+                                            val addresses = Geocoder(activity, Locale("ar")).getFromLocation(latitude, longitude, 1)
+                                            val address = addresses?.firstOrNull()
+                                            address?.locality
+                                                ?: address?.subLocality
+                                                ?: address?.subAdminArea
+                                                ?: address?.adminArea
+                                                ?: ""
+                                        } else ""
+                                    } catch (_: Exception) { "" }
+                                    val safeCity = org.json.JSONObject.quote(city)
+                                    web.post {
+                                        web.evaluateJavascript(
+                                            "window.onNativeLocation({lat:$latitude,lon:$longitude,accuracy:${location.accuracy},city:$safeCity})",
+                                            null
+                                        )
+                                    }
+                                }.start()
                             }
                         }
                         @Deprecated("Deprecated in Android")
